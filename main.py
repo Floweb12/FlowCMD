@@ -1,70 +1,90 @@
+import requests
 import os
 import subprocess
-import requests
 import sys
 
-VERSION = "1.0.0"
-# Jetzt mit deinem echten GitHub-Pfad:
-GITHUB_USER = "flowtech12"
-EXE_URL = f"https://github.com/{GITHUB_USER}/FlowCMD/raw/main/dist/FlowCMD.exe"
-VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/FlowCMD/main/version.txt"
-
-def run_update():
-    print(">>> Update wird heruntergeladen...")
-    r = requests.get(EXE_URL)
-    with open("FlowCMD_new.exe", "wb") as f:
-        f.write(r.content)
-    
-    # Erstellt eine temporäre Batch-Datei, um die EXE zu ersetzen
-    with open("update.bat", "w") as f:
-        f.write(f'@echo off\n')
-        f.write(f'timeout /t 2 /nobreak > nul\n') # Wartet kurz, bis FlowCMD schließt
-        f.write(f'del FlowCMD.exe\n')
-        f.write(f'ren FlowCMD_new.exe FlowCMD.exe\n')
-        f.write(f'start FlowCMD.exe\n')
-        f.write(f'del "%~f0"\n') # Löscht sich selbst (die .bat) danach
-    
-    print(">>> Update bereit. FlowCMD startet neu...")
-    os.startfile("update.bat")
-    sys.exit()
+# --- EINSTELLUNGEN ---
+CURRENT_VERSION = "1.0.0"
+# Dein GitHub-Pfad (Floweb12)
+VERSION_URL = "https://raw.githubusercontent.com/Floweb12/FlowCMD/main/version.txt"
+UPDATE_URL = "https://github.com/Floweb12/FlowCMD/releases/latest/download/setup.exe"
 
 def check_for_updates():
+    """Prüft online bei Floweb12 nach einer neuen Version."""
+    print(f"[*] Suche nach Updates für FlowCMD (v{CURRENT_VERSION})...")
     try:
-        r = requests.get(VERSION_URL, timeout=3)
-        if r.status_code == 200:
-            online_version = r.text.strip()
-            if online_version > VERSION:
-                return online_version
-    except:
-        pass
-    return None
+        response = requests.get(VERSION_URL, timeout=5)
+        online_version = response.text.strip()
+
+        if online_version != CURRENT_VERSION:
+            print(f"\n[!] UPDATE VERFÜGBAR: Version {online_version} gefunden!")
+            choice = input("Möchtest du das Update jetzt installieren? (j/n): ")
+            if choice.lower() == 'j':
+                download_update()
+        else:
+            print("[+] FlowCMD ist auf dem neuesten Stand.\n")
+    except Exception as e:
+        print(f"[-] Update-Server nicht erreichbar: {e}\n")
+
+def download_update():
+    """Lädt die neue setup.exe herunter und startet sie."""
+    print("[*] Windows wird auf das Update vorbereitet...")
+    try:
+        r = requests.get(UPDATE_URL, stream=True)
+        with open("setup_update.exe", "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        print("[+] Download abgeschlossen. Installer startet...")
+        subprocess.Popen(["setup_update.exe"])
+        sys.exit(0) # Beendet FlowCMD für die Installation
+    except Exception as e:
+        print(f"[-] Fehler beim Download: {e}")
 
 def main():
-    print(f"--- FlowCMD v{VERSION} gestartet ---")
-    new_v = check_for_updates()
-    if new_v:
-        print(f"[!] UPDATE VERFÜGBAR: Version {new_v}")
-        wahl = input("Jetzt updaten? (j/n): ")
-        if wahl.lower() == 'j':
-            run_update()
+    """Die Hauptschleife deines Tools."""
+    print("========================================")
+    print(f"      FlowCMD v{CURRENT_VERSION} - Floweb12")
+    print("   Tippe 'help' für Befehle oder 'exit'")
+    print("========================================\n")
 
     while True:
-        cmd = input(f"\nFlow@CMD >> ").lower().strip()
-        
-        if cmd.startswith("mkdir "):
-            name = cmd.split(" ", 1)[1]
-            os.makedirs(name, exist_ok=True)
-            print(f"Ordner '{name}' erstellt.")
-            
-        elif cmd.startswith("install "):
-            app = cmd.split(" ", 1)[1]
-            print(f"Windows bereitet {app} vor...")
-            subprocess.run(["winget", "install", "-e", "--id", app])
-            
-        elif cmd == "exit":
-            break
-        else:
-            print("Befehle: mkdir [Name], install [Programm], exit")
+        # Dein Prompt (Eingabezeile)
+        cmd = input("FlowCMD > ").lower().strip()
 
+        if cmd == "exit":
+            print("Bis zum nächsten Mal, Flow!")
+            break
+        
+        elif cmd == "help":
+            print("\nVerfügbare Befehle:")
+            print(" - help:  Zeigt diese Liste")
+            print(" - info:  Infos über FlowCMD")
+            print(" - cls:   Bildschirm leeren")
+            print(" - exit:  Programm beenden\n")
+        
+        elif cmd == "info":
+            print(f"\nFlowCMD Version: {CURRENT_VERSION}")
+            print("Entwickler: Flow (Floweb12)")
+            print("Status: Feiertags-Build (St. Josef)\n")
+        
+        elif cmd == "cls":
+            os.system('cls' if os.name == 'nt' else 'clear')
+        
+        elif cmd == "":
+            continue
+            
+        else:
+            print(f"[-] Befehl '{cmd}' unbekannt. Tippe 'help' für Hilfe.")
+
+# --- STARTPUNKT ---
 if __name__ == "__main__":
-    main()
+    # 1. Update prüfen
+    check_for_updates()
+    
+    # 2. Tool starten
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nFlowCMD abgebrochen.")
+        sys.exit(0)
